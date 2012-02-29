@@ -101,6 +101,12 @@ ramips_board_name() {
 	*"RT-N15")
 		name="rt-n15"
 		;;
+	*"RT-N56U")
+		name="rt-n56u"
+		;;
+	*"Skyline SL-R7205"*)
+		name="sl-r7205"
+		;;
 	*"Sparklan WCR-150GN")
 		name="wcr-150gn"
 		;;
@@ -118,6 +124,9 @@ ramips_board_name() {
 		;;
 	*"Sitecom WL-351 v1 002")
 		name="wl-351"
+		;;
+	*"Ralink V11ST-FE")
+		name="v11st-fe"
 		;;
 	*"WLI-TX4-AG300N")
 		name="wli-tx4-ag300n"

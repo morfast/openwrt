@@ -128,7 +128,7 @@ ifndef DUMP
     -include $(TOOLCHAIN_DIR)/info.mk
     export GCC_HONOUR_COPTS:=0
     TARGET_CROSS:=$(if $(TARGET_CROSS),$(TARGET_CROSS),$(OPTIMIZE_FOR_CPU)-openwrt-linux$(if $(TARGET_SUFFIX),-$(TARGET_SUFFIX))-)
-    TARGET_CFLAGS+= -fhonour-copts
+    TARGET_CFLAGS+= -fhonour-copts $(if $(CONFIG_GCC_VERSION_4_4)$(CONFIG_GCC_VERSION_4_5),,-Wno-error=unused-but-set-variable)
     TARGET_CPPFLAGS+= -I$(TOOLCHAIN_DIR)/usr/include -I$(TOOLCHAIN_DIR)/include
     TARGET_LDFLAGS+= -L$(TOOLCHAIN_DIR)/usr/lib -L$(TOOLCHAIN_DIR)/lib
     TARGET_PATH:=$(TOOLCHAIN_DIR)/bin:$(TARGET_PATH)
@@ -219,9 +219,10 @@ else
     endif
   endif
   RSTRIP:= \
+    export CROSS="$(TARGET_CROSS)"; \
     NM="$(TARGET_CROSS)nm" \
     STRIP="$(STRIP)" \
-    STRIP_KMOD="$(TARGET_CROSS)strip --strip-unneeded -R .comment -R .pdr -R .mdebug.abi32 -R .note.gnu.build-id -R .gnu.attributes -R .reginfo -x" \
+    STRIP_KMOD="$(SCRIPT_DIR)/strip-kmod.sh" \
     $(SCRIPT_DIR)/rstrip.sh
 endif
 

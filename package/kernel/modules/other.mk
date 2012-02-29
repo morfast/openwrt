@@ -751,7 +751,7 @@ $(eval $(call KernelPackage,rtc-core))
 define KernelPackage/rtc-pcf8563
   SUBMENU:=$(OTHER_MENU)
   TITLE:=Philips PCF8563/Epson RTC8564 RTC support
-  DEPENDS:=+kmod-rtc-core
+  DEPENDS:=+(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39||BROKEN):kmod-rtc-core
   KCONFIG:=CONFIG_RTC_DRV_PCF8563
   FILES:=$(LINUX_DIR)/drivers/rtc/rtc-pcf8563.ko
   AUTOLOAD:=$(call AutoLoad,60,rtc-pcf8563)
@@ -768,7 +768,7 @@ $(eval $(call KernelPackage,rtc-pcf8563))
 define KernelPackage/rtc-pcf2123
   SUBMENU:=$(OTHER_MENU)
   TITLE:=Philips PCF2123 RTC support
-  DEPENDS:=+kmod-rtc-core
+  DEPENDS:=+(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39||BROKEN):kmod-rtc-core
   KCONFIG:=CONFIG_RTC_DRV_PCF2123
   FILES:=$(LINUX_DIR)/drivers/rtc/rtc-pcf2123.ko
   AUTOLOAD:=$(call AutoLoad,60,rtc-pcf2123)
@@ -796,3 +796,25 @@ define KernelPackage/n810bm/description
 endef
 
 $(eval $(call KernelPackage,n810bm))
+
+
+define KernelPackage/mtdtests
+  SUBMENU:=$(OTHER_MENU)
+  TITLE:=MTD subsystem tests
+  KCONFIG:=CONFIG_MTD_TESTS
+  FILES:=\
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_nandecctest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_oobtest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_pagetest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_readtest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_speedtest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_stresstest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_subpagetest.ko \
+	$(LINUX_DIR)/drivers/mtd/tests/mtd_torturetest.ko
+endef
+
+define KernelPackage/mtdtests/description
+ Kernel modules for MTD subsystem/driver testing.
+endef
+
+$(eval $(call KernelPackage,mtdtests))
