@@ -629,7 +629,7 @@ define KernelPackage/cs5535-mfd
   KCONFIG:=CONFIG_MFD_CS5535
   FILES:= \
   	$(LINUX_DIR)/drivers/mfd/mfd-core.ko \
-  	$(LINUX_DIR)/drivers/mfd/cs5535-mfd.ko 
+  	$(LINUX_DIR)/drivers/mfd/cs5535-mfd.ko
   AUTOLOAD:=$(call AutoLoad,44,mfd-core cs5535-mfd)
 endef
 
@@ -702,6 +702,23 @@ define KernelPackage/wdt-scx200/description
 endef
 
 $(eval $(call KernelPackage,wdt-scx200))
+
+
+define KernelPackage/wdt-ath79
+  SUBMENU:=$(OTHER_MENU)
+  TITLE:=Atheros AR7XXX/AR9XXX watchdog timer
+  DEPENDS:=@TARGET_ar71xx
+  KCONFIG:=CONFIG_ATH79_WDT
+  FILES:=$(LINUX_DIR)/drivers/$(WATCHDOG_DIR)/ath79_wdt.ko
+  AUTOLOAD:=$(call AutoLoad,50,ath79_wdt)
+endef
+
+define KernelPackage/wdt-ath79/description
+  Kernel module for AR7XXX/AR9XXX watchdog timer.
+endef
+
+$(eval $(call KernelPackage,wdt-ath79))
+
 
 define KernelPackage/pwm
   SUBMENU:=$(OTHER_MENU)
@@ -818,3 +835,40 @@ define KernelPackage/mtdtests/description
 endef
 
 $(eval $(call KernelPackage,mtdtests))
+
+
+define KernelPackage/nand
+  SUBMENU:=$(OTHER_MENU)
+  TITLE:=NAND flash support
+  DEPENDS:=@!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39)
+  KCONFIG:=CONFIG_MTD_NAND \
+	CONFIG_MTD_NAND_IDS \
+	CONFIG_MTD_NAND_ECC
+  FILES:= \
+	$(LINUX_DIR)/drivers/mtd/nand/nand_ids.ko \
+	$(LINUX_DIR)/drivers/mtd/nand/nand_ecc.ko \
+	$(LINUX_DIR)/drivers/mtd/nand/nand.ko
+  AUTOLOAD:=$(call AutoLoad,20,nand_ids nand_ecc nand)
+endef
+
+define KernelPackage/nand/description
+ Kernel module for NAND support.
+endef
+
+$(eval $(call KernelPackage,nand))
+
+
+define KernelPackage/nandsim
+  SUBMENU:=$(OTHER_MENU)
+  TITLE:=NAND simulator
+  DEPENDS:=@!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39) +kmod-nand
+  KCONFIG:=CONFIG_MTD_NAND_NANDSIM
+  FILES:=$(LINUX_DIR)/drivers/mtd/nand/nandsim.ko
+endef
+
+define KernelPackage/nandsim/description
+ Kernel module for NAND flash simulation.
+endef
+
+$(eval $(call KernelPackage,nandsim))
+
