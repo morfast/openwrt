@@ -1,6 +1,6 @@
 diff -Naur ppp-2.4.5.0/pppd/chap-new.c ppp-2.4.5/pppd/chap-new.c
 --- ppp-2.4.5.0/pppd/chap-new.c	2012-02-12 12:03:55.000000000 +0800
-+++ ppp-2.4.5/pppd/chap-new.c	2012-02-12 12:13:17.000000000 +0800
++++ ppp-2.4.5/pppd/chap-new.c	2012-04-07 21:02:08.000000000 +0800
 @@ -37,6 +37,8 @@
  #include "chap-new.h"
  #include "chap-md5.h"
@@ -14,7 +14,7 @@ diff -Naur ppp-2.4.5.0/pppd/chap-new.c ppp-2.4.5/pppd/chap-new.c
  int chap_max_transmits = 10;
  int chap_rechallenge_time = 0;
  int chapms_strip_domain = 0;
-+bool syncpppd = 0;
++int npppd = 0;
  
  /*
   * Command-line options.
@@ -22,29 +22,34 @@ diff -Naur ppp-2.4.5.0/pppd/chap-new.c ppp-2.4.5/pppd/chap-new.c
  	  "Set interval for rechallenge", OPT_PRIO },
  	{ "chapms-strip-domain", o_bool, &chapms_strip_domain,
  	  "Strip the domain prefix before the Username", 1 },
-+    { "syncppp", o_bool, &syncpppd,
-+      "sync among multiple pppd when sending chap respond", 1 },
++    { "syncppp", o_int, &npppd,
++      "number of pppd to sync when sending CHAP respond", OPT_PRIO },
  	{ NULL }
  };
  
-@@ -492,6 +497,14 @@
+@@ -492,6 +497,19 @@
  	p[2] = len >> 8;
  	p[3] = len;
  
-+    if (syncpppd) {
-+        if (syncppp() < 0) {
++    if (npppd > 1) {
++        if (syncppp(npppd) < 0) {
 +            error("syncppp sync fail");
++            sem_unlink(SEM_COUNT_NAME);
++            sem_unlink(SEM_BLOCK_NAME);
 +        } else {
 +            info("syncppp sync succeeded");
 +        }   
++    } else {
++        info("syncppp not active");
 +    }
++
 +
  	output(0, response, PPP_HDRLEN + len);
  }
  
 diff -Naur ppp-2.4.5.0/pppd/Makefile.linux ppp-2.4.5/pppd/Makefile.linux
 --- ppp-2.4.5.0/pppd/Makefile.linux	2012-02-12 12:03:55.000000000 +0800
-+++ ppp-2.4.5/pppd/Makefile.linux	2012-02-12 12:18:59.000000000 +0800
++++ ppp-2.4.5/pppd/Makefile.linux	2012-04-07 20:57:22.000000000 +0800
 @@ -13,16 +13,16 @@
  
  PPPDSRCS = main.c magic.c fsm.c lcp.c ipcp.c upap.c chap-new.c md5.c ccp.c \
@@ -84,255 +89,82 @@ diff -Naur ppp-2.4.5.0/pppd/Makefile.linux ppp-2.4.5/pppd/Makefile.linux
  # Enable Microsoft proprietary Callback Control Protocol
  #CBCP=y
  
-@@ -97,6 +100,14 @@
+@@ -97,6 +100,7 @@
  endif
  endif
  
-+# syncppp
-+ifdef SYNC_PPP
-+TARGETS += syncpppinit
-+EXTRAINSTALL = $(INSTALL) -c -m 555 syncpppinit $(BINDIR)/syncpppinit
-+EXTRACLEAN += syncpppinit.o
-+endif
-+
 +
  # EAP SRP-SHA1
  ifdef USE_SRP
  CFLAGS	+= -DUSE_SRP -DOPENSSL -I/usr/local/ssl/include
-@@ -219,6 +230,9 @@
- pppd: $(PPPDOBJS)
- 	$(CC) $(CFLAGS) $(LDFLAGS) -o pppd $(PPPDOBJS) $(LIBS)
- 
-+syncpppinit:    syncpppinit.c
-+	${CC} $(CFLAGS) $(LDFLAGS) -o syncpppinit syncpppinit.c $(LIBS)
-+
- srp-entry:	srp-entry.c
- 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ srp-entry.c $(LIBS)
- 
 diff -Naur ppp-2.4.5.0/pppd/syncppp.c ppp-2.4.5/pppd/syncppp.c
 --- ppp-2.4.5.0/pppd/syncppp.c	1970-01-01 08:00:00.000000000 +0800
-+++ ppp-2.4.5/pppd/syncppp.c	2012-02-12 12:10:15.000000000 +0800
-@@ -0,0 +1,56 @@
-+#include <stdio.h>
-+#include <sys/types.h>
-+#include <sys/shm.h>
-+#include <sys/ipc.h>
-+#include <stdlib.h>
-+#include <semaphore.h>
-+#include <fcntl.h>
-+#include <sys/file.h>
++++ ppp-2.4.5/pppd/syncppp.c	2012-04-07 21:01:54.000000000 +0800
+@@ -0,0 +1,61 @@
++#include<stdio.h>
++#include<semaphore.h>
++#include<fcntl.h>
++#include<stdlib.h>
 +#include "pppd.h"
 +#include "syncppp.h"
-+#include <sys/stat.h>
-+#include <unistd.h>
 +
-+int syncppp(void)
++int syncppp(int nproc)
 +{
-+    int shm_id;
-+    key_t key;
-+    int fdlock;
-+    struct semaphores *semphs;
++    int flags;
++    int value;
++    sem_t *block; 
++    sem_t *count;
 +
-+    if ((key = ftok(keyfilename, PROJ_ID)) == -1) {
-+        error("ftok key error");
++    if (nproc <= 1) {
++        error("syncppp: number of pppd should be larger than 1");
 +        return -1;
 +    }
 +
-+    if ((shm_id = shmget(key, 1, 0644)) < 0) {
-+        error("shmget error");
++    flags = O_RDWR | O_CREAT;
++    block = sem_open(SEM_BLOCK_NAME, flags, 0644, 0);
++    count = sem_open(SEM_COUNT_NAME, flags, 0644, 0);
++    if (block == SEM_FAILED || count == SEM_FAILED) {
++        error("syncppp: sem_open failed");
 +        return -1;
 +    }
 +
-+    if ( (void *)(semphs = shmat(shm_id, 0, 0)) == (void *)-1) {
-+        error("shmat error");
++    if (sem_post(count) < 0) {
++        error("syncppp: sem_post failed");
 +        return -1;
 +    }
-+
-+    if ((sem_post(&(semphs->count))) < 0) {
-+        error("sem_post error");
++    if (sem_getvalue(count, &value) < 0) {
++        error("syncppp: sem_getvalue failed");
 +        return -1;
 +    }
++    info("%d pppd have arrived, waiting for the left %d", value, nproc-value);
++    if (value >= nproc) {
++        while (nproc-1 > 0) {
++            if (sem_post(block) < 0) {
++                error("syncppp: sem_post failed");
++                return -1;
++            }
++            nproc--;
++        }
++    } else {
++        if (sem_wait(block) < 0) {
++            error("syncppp: sem_wait failed");
++            return -1;
++        }
 +
-+    shmdt(semphs);
-+
-+    if ((fdlock = open(lockfilename,O_RDONLY, 0644)) < 0) {
-+        error("lockfile open error");
-+        return -1;
 +    }
 +
-+    if (flock(fdlock,LOCK_SH) < 0) {
-+        error("flock error");
-+        return -1;
-+    }
-+    close(fdlock);
++    sem_close(count);
++    sem_close(block);
++
++    sem_unlink(SEM_COUNT_NAME);
++    sem_unlink(SEM_BLOCK_NAME);
 +
 +    return 0;
-+
 +}
++
 diff -Naur ppp-2.4.5.0/pppd/syncppp.h ppp-2.4.5/pppd/syncppp.h
 --- ppp-2.4.5.0/pppd/syncppp.h	1970-01-01 08:00:00.000000000 +0800
-+++ ppp-2.4.5/pppd/syncppp.h	2012-02-12 12:10:15.000000000 +0800
-@@ -0,0 +1,13 @@
-+#include<semaphore.h>
-+
-+#define MAX_PPP_NUM 30
-+#define PROJ_ID 225
-+#define keyfilename "/tmp/pppkeyfile"
-+#define lockfilename "/tmp/ppplockfile"
-+
-+int syncppp(void);
-+
-+struct semaphores {
-+    sem_t count;  /* count the pppd processes which has recieved the challenge */
-+};
-+
-diff -Naur ppp-2.4.5.0/pppd/syncpppinit.c ppp-2.4.5/pppd/syncpppinit.c
---- ppp-2.4.5.0/pppd/syncpppinit.c	1970-01-01 08:00:00.000000000 +0800
-+++ ppp-2.4.5/pppd/syncpppinit.c	2012-02-12 12:10:15.000000000 +0800
-@@ -0,0 +1,97 @@
-+#include<stdio.h>
-+#include<sys/types.h>
-+#include<sys/shm.h>
-+#include<sys/ipc.h>
-+#include<stdlib.h>
-+#include <semaphore.h>
-+#include <fcntl.h>
-+#include <sys/file.h>
-+#include <sys/stat.h>
-+#include<unistd.h>
-+#include "syncppp.h"
-+
-+int openlockfile()
-+{
-+    int fdlock;
-+
-+    if ((fdlock = creat(lockfilename, 0644)) < 0) {
-+        perror("fdlock open error");
-+        exit(1);
-+    }
-+    return fdlock;
-+}
-+
-+void lockfile(int fdlock)
-+{
-+    if (flock(fdlock, LOCK_EX) < 0) {
-+        perror("flock lock error");
-+        exit(1);
-+    }    
-+    fprintf(stderr,"syncpppinit: locked\n");
-+}
-+
-+void unlockfile(int fdlock)
-+{
-+    if (flock(fdlock, LOCK_UN) < 0) {
-+        perror("flock unlock error");
-+        exit(1);
-+    }
-+}
-+
-+
-+int main(int argc, char *argv[])
-+{
-+    int shm_id;
-+    int ppp_num;
-+    int fdlock;
-+    sem_t *p_sem;
-+    key_t key;
-+    struct semaphores *semphs;
-+
-+    if (argc != 2) {
-+        fprintf(stderr, "Usage: %s <number of pppd>\n", argv[0]);
-+        exit(1);
-+    }
-+    
-+    ppp_num = atoi(argv[1]);
-+    if (ppp_num > MAX_PPP_NUM || ppp_num <= 0) {
-+        fprintf(stderr, "Number of pppd beyoung limit\n");
-+        exit(1);
-+    }
-+
-+    /* create a uniqe key */
-+    creat(keyfilename, 0755);
-+    if ((key = ftok(keyfilename, PROJ_ID)) == -1) {
-+        perror("key error");
-+        exit(1);
-+    }
-+
-+    shm_id = shmget(key, sizeof(struct semaphores), IPC_CREAT | IPC_EXCL | 0644);
-+    if (shm_id < 0) {
-+        /* exist */
-+        shm_id = shmget(key, 1, 0644);
-+    }
-+
-+    if ( (void *)(semphs = shmat(shm_id, 0, 0)) == (void *)-1) {
-+        perror("shmat error");
-+        exit(1);
-+    }
-+
-+    if (sem_init(&(semphs->count), 1, 0) < 0) {
-+        perror("sem_init error"); /* shared between processes, init 0 */
-+        exit(1);
-+    }
-+
-+    fdlock = openlockfile();
-+    lockfile(fdlock);
-+
-+    while (ppp_num > 0) {
-+        sem_wait(&(semphs->count));
-+        fprintf(stderr,"%d ",ppp_num);
-+        ppp_num--;
-+    }
-+    unlockfile(fdlock);
-+    fprintf(stderr,"\nsyncpppinit: unlocked\n");
-+
-+    return 0;
-+}
-diff -Naur ppp-2.4.5.0/pppd/upap.c ppp-2.4.5/pppd/upap.c
---- ppp-2.4.5.0/pppd/upap.c	2012-02-12 12:03:55.000000000 +0800
-+++ ppp-2.4.5/pppd/upap.c	2012-02-22 22:19:42.000000000 +0800
-@@ -52,9 +52,12 @@
- #include "pppd.h"
- #include "upap.h"
- 
-+#include "syncppp.h"
-+
- static const char rcsid[] = RCSID;
- 
- static bool hide_password = 1;
-+static bool syncpppd = 0;
- 
- /*
-  * Command-line options.
-@@ -72,6 +75,9 @@
-     { "pap-timeout", o_int, &upap[0].us_reqtimeout,
-       "Set time limit for peer PAP authentication", OPT_PRIO },
- 
-+    { "syncppp", o_bool, &syncpppd,
-+      "sync among multiple pppd when sending chap respond", 1 },
-+
-     { NULL }
- };
- 
-@@ -568,6 +574,14 @@
-     PUTCHAR(u->us_passwdlen, outp);
-     BCOPY(u->us_passwd, outp, u->us_passwdlen);
- 
-+    if (syncpppd) {
-+        if (syncppp() < 0) {
-+            error("syncppp sync fail");
-+        } else {
-+            info("syncppp sync succeeded");
-+        }   
-+    }
-+
-     output(u->us_unit, outpacket_buf, outlen + PPP_HDRLEN);
- 
-     TIMEOUT(upap_timeout, u, u->us_timeouttime);
-@@ -598,6 +612,7 @@
-     PUTSHORT(outlen, outp);
-     PUTCHAR(msglen, outp);
-     BCOPY(msg, outp, msglen);
-+
-     output(u->us_unit, outpacket_buf, outlen + PPP_HDRLEN);
- }
- 
++++ ppp-2.4.5/pppd/syncppp.h	2012-04-07 21:01:16.000000000 +0800
+@@ -0,0 +1,2 @@
++#define SEM_BLOCK_NAME  "block"
++#define SEM_COUNT_NAME  "count"
