@@ -12,7 +12,11 @@ MODULE="$1"
 }
 
 ARGS=
-[ -n "$KEEP_SYMBOLS" ] || ARGS="-x -G __this_module --strip-unneeded"
+if [ -n "$KEEP_SYMBOLS" ]; then
+	ARGS="-X --strip-debug"
+else
+	ARGS="-x -G __this_module --strip-unneeded"
+fi
 
 ${CROSS}objcopy \
 	-R .comment \
@@ -34,9 +38,10 @@ BEGIN {
 	n = 0
 }
 
-$3 && $2 ~ /[brtd]/ && $3 !~ /\$LC/ {
+$3 && $2 ~ /[brtd]/ && $3 !~ /\$LC/ && !def[$3] {
 	print "--redefine-sym "$3"=_"n;
 	n = n + 1
+	def[$3] = 1
 }
 ' > "$MODULE.tmp1"
 

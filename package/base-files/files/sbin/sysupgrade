@@ -1,5 +1,5 @@
 #!/bin/sh
-. /etc/functions.sh
+. /lib/functions.sh
 
 # initialize defaults
 RAMFS_COPY_BIN=""	# extra programs for temporary ramfs root
@@ -25,7 +25,7 @@ while [ -n "$1" ]; do
 		-c) export SAVE_OVERLAY=1;;
 		-b|--create-backup) export CONF_BACKUP="$2"; shift;;
 		-f) export CONF_IMAGE="$2"; shift;;
-		-F|--force) export FORCE=1; shift;;
+		-F|--force) export FORCE=1;;
 		-h|--help) export HELP=1; break;;
 		-*)
 			echo "Invalid option: $1"
@@ -169,7 +169,7 @@ kill_remaining KILL
 
 if [ -n "$(rootfs_type)" ]; then
 	v "Switching to ramdisk..."
-	run_ramfs '. /etc/functions.sh; include /lib/upgrade; do_upgrade'
+	run_ramfs '. /lib/functions.sh; include /lib/upgrade; do_upgrade'
 else
 	do_upgrade
 fi

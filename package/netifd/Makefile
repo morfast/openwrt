@@ -1,13 +1,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netifd
-PKG_VERSION:=2012-03-05
+PKG_VERSION:=2012-08-11
 PKG_RELEASE=$(PKG_SOURCE_VERSION)
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=git://nbd.name/luci2/netifd.git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=4b8e81a146de42ba9608d7a7aabba3e1be03c585
+PKG_SOURCE_VERSION:=9411d498c46fe3f1c4d79eb8fa0b7c97dd32a990
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 # PKG_MIRROR_MD5SUM:=
 # CMAKE_INSTALL:=1
@@ -18,7 +18,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/netifd
   SECTION:=base
   CATEGORY:=Base system
-  DEPENDS:=+libuci +libnl-tiny +libubus +ubus +ubusd +jshn @USE_NETIFD
+  DEPENDS:=+libuci +libnl-tiny +libubus +ubus +ubusd +jshn
   TITLE:=OpenWrt Network Interface Configuration Daemon
 endef
 
