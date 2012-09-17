@@ -12,7 +12,7 @@ include $(INCLUDE_DIR)/host-build.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 define cc
-	$(HOSTCC) $(HOST_CFLAGS) -include endian.h -static -o $(HOST_BUILD_DIR)/bin/$(firstword $(1)) $(foreach src,$(1),src/$(src).c) $(2)
+	$(HOSTCC) $(HOST_CFLAGS) -include endian.h $(HOST_STATIC_LINKING) -o $(HOST_BUILD_DIR)/bin/$(firstword $(1)) $(foreach src,$(1),src/$(src).c) $(2)
 endef
 
 define Host/Compile
@@ -21,6 +21,7 @@ define Host/Compile
 	$(call cc,trx)
 	$(call cc,motorola-bin)
 	$(call cc,dgfirmware)
+	$(call cc,mkdir615h1 md5)
 	$(call cc,trx2usr)
 	$(call cc,ptgen)
 	$(call cc,airlink)
@@ -58,6 +59,7 @@ define Host/Compile
 	$(call cc,mkbrncmdline)
 	$(call cc,mkbrnimg)
 	$(call cc,mkdapimg)
+	$(call cc, mkcameofw, -Wall)
 endef
 
 define Host/Install
